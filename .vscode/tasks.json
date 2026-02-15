@@ -1,0 +1,109 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Open iPhone Simulator",
+      "type": "shell",
+      "command": "open -a Simulator",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "group": "none"
+    },
+    {
+      "label": "Open App in iPhone Simulator",
+      "type": "shell",
+      "command": "open -a Simulator && sleep 3 && xcrun simctl openurl booted http://localhost:5173",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "group": "test"
+    },
+    {
+      "label": "List iPhone Simulators",
+      "type": "shell",
+      "command": "xcrun simctl list devices available | grep iPhone",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Boot iPhone 15 Pro",
+      "type": "shell",
+      "command": "xcrun simctl boot 'iPhone 15 Pro' 2>/dev/null || echo 'Simulator already booted or not found'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Start Android Emulator",
+      "type": "shell",
+      "command": "emulator -list-avds | head -1 | xargs -I {} emulator -avd {} &",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "group": "test"
+    },
+    {
+      "label": "List Android Emulators",
+      "type": "shell",
+      "command": "emulator -list-avds 2>/dev/null || echo 'Android emulator not found. Install Android Studio first.'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Check Android Devices",
+      "type": "shell",
+      "command": "adb devices 2>/dev/null || echo 'adb not found. Install Android Studio or SDK Platform Tools.'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Forward Port to Android Phone",
+      "type": "shell",
+      "command": "adb reverse tcp:5173 tcp:5173 && echo 'Port forwarded! Open Chrome on phone: http://localhost:5173'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Start Dev Server with Network Access",
+      "type": "shell",
+      "command": "npm run dev -- --host",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "Show Mac IP Address",
+      "type": "shell",
+      "command": "echo '\n📱 Your Mac IP addresses:\n' && ifconfig | grep 'inet ' | grep -v 127.0.0.1 && echo '\n💡 Access app from phone: http://[IP_ADDRESS]:5173/'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

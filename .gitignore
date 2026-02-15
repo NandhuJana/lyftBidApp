@@ -1,0 +1,32 @@
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+*.log
+.vscode/*
+!.vscode/settings.json
+
+# Production environment variables - NEVER commit!
+.env.production
+*.env.production
+
+# Capacitor native app folders
+android/
+ios/
+capacitor.config.ts
+
+# Sensitive files
+*.key
+*.pem
+*.p12
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+
+# App store assets
+app-store-assets/
+screenshots/
+
+# Keep VSCode tasks
+!.vscode/tasks.json
