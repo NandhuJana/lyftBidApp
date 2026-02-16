@@ -1,29 +1,62 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { ArrowLeft, Clock, DollarSign, TrendingUp } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
-import { mockProducts, mockBids } from "../data/mockData";
+import { productsAPI, bidsAPI, type ProductResponse, type BidResponse } from "@/services/api";
+import { getFallbackProduct, getFallbackBids } from "../data/fallbackData"; // TODO: Remove once API is live
 import { toast } from "sonner";
 import { Toaster } from "./ui/sonner";
 
-const productImages: Record<string, string> = {
-  "1": "https://images.unsplash.com/photo-1588420635201-3a9e2a2a0a07?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwY2FtZXJhJTIwcGhvdG9ncmFwaHl8ZW58MXx8fHwxNzcwNzk1MTY3fDA&ixlib=rb-4.1.0&q=80&w=1080",
-  "2": "https://images.unsplash.com/photo-1639564879163-a2a85682410e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjB3YXRjaCUyMHRpbWVwaWVjZXxlbnwxfHx8fDE3NzA3ODM3Nzd8MA&ixlib=rb-4.1.0&q=80&w=1080",
-  "3": "https://images.unsplash.com/photo-1656480930913-dc35796ff5cc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGJpa2UlMjBvdXRkb29yfGVufDF8fHx8MTc3MDg1OTE5Mnww&ixlib=rb-4.1.0&q=80&w=1080",
-};
+function getTimeRemaining(endTime: string): string {
+  const end = new Date(endTime).getTime();
+  const now = Date.now();
+  const diff = end - now;
+  if (diff <= 0) return "Ended";
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  if (days > 0) return `${days}d ${hours}h`;
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
 
 export function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [bidAmount, setBidAmount] = useState("");
+  const [product, setProduct] = useState<ProductResponse | null>(null);
+  const [bids, setBids] = useState<BidResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const product = mockProducts.find((p) => p.id === id);
-  const productBids = mockBids.filter((b) => b.productId === id);
-  const highestBid = productBids.length > 0 
-    ? Math.max(...productBids.map((b) => b.bidAmount))
-    : null;
+  useEffect(() => {
+    if (!id) return;
+    Promise.all([
+      productsAPI.getById(id),
+      bidsAPI.getByProduct(id),
+    ])
+      .then(([prod, bidList]) => {
+        setProduct(prod);
+        setBids(bidList);
+      })
+      .catch(() => {
+        // TODO: Remove fallback once API is live
+        const fb = getFallbackProduct(id);
+        setProduct(fb ?? null);
+        setBids(fb ? getFallbackBids(id) : []);
+      })
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -33,28 +66,43 @@ export function ProductDetails() {
     );
   }
 
-  const handlePlaceBid = (e: React.FormEvent) => {
+  const highestBid = bids.length > 0
+    ? Math.max(...bids.map((b) => b.amount))
+    : null;
+
+  const isOpen = product.status === "ACTIVE" || product.status === "open";
+
+  const handlePlaceBid = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseFloat(bidAmount);
-    
-    if (amount <= product.askPrice) {
-      toast.error(`Bid must be higher than ask price ($${product.askPrice})`);
-      return;
-    }
 
     if (highestBid && amount <= highestBid) {
       toast.error(`Bid must be higher than current highest bid ($${highestBid})`);
       return;
+    } else if (!highestBid && amount <= product.startingPrice) {
+      toast.error(`Bid must be higher than starting price ($${product.startingPrice})`);
+      return;
     }
 
-    toast.success(`Bid of $${amount} placed successfully!`);
-    setBidAmount("");
+    setSubmitting(true);
+    try {
+      const newBid = await bidsAPI.create({ productId: product.id, amount });
+      setBids((prev) => [newBid, ...prev]);
+      toast.success(`Bid of $${amount} placed successfully!`);
+      setBidAmount("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to place bid");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const minBid = highestBid ? highestBid + 1 : product.startingPrice + 1;
 
   return (
     <div className="h-full flex flex-col bg-white">
       <Toaster />
-      
+
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center gap-3">
@@ -75,7 +123,7 @@ export function ProductDetails() {
         {/* Product Image */}
         <div className="aspect-video w-full overflow-hidden bg-gray-100">
           <img
-            src={productImages[product.id]}
+            src={product.images?.[0] || "https://via.placeholder.com/800x400?text=No+Image"}
             alt={product.title}
             className="w-full h-full object-cover"
           />
@@ -87,24 +135,22 @@ export function ProductDetails() {
           <div>
             <div className="flex items-start justify-between mb-2">
               <h2 className="text-2xl flex-1">{product.title}</h2>
-              <Badge
-                variant={product.status === "open" ? "default" : "secondary"}
-              >
-                {product.status === "open" ? "Open" : "Closed"}
+              <Badge variant={isOpen ? "default" : "secondary"}>
+                {isOpen ? "Open" : "Closed"}
               </Badge>
             </div>
             <p className="text-gray-600">{product.description}</p>
           </div>
 
-          {/* Ask Price Section - Prominent */}
+          {/* Price Section */}
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-900 mb-2">
-                  Seller's Ask Price
+                  Starting Price
                 </p>
                 <p className="text-4xl font-bold text-blue-900">
-                  ${product.askPrice}
+                  ${product.startingPrice}
                 </p>
               </div>
               <div className="w-16 h-16 bg-blue-200 rounded-full flex items-center justify-center">
@@ -127,8 +173,8 @@ export function ProductDetails() {
           <div className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg p-3">
             <Clock className="h-4 w-4 text-gray-500" />
             <span className="text-gray-700 font-medium">
-              {product.status === "open" 
-                ? `${product.timeToClose} remaining`
+              {isOpen
+                ? `${getTimeRemaining(product.endTime)} remaining`
                 : "Bidding ended"}
             </span>
           </div>
@@ -138,19 +184,17 @@ export function ProductDetails() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-gray-700" />
-                <h3 className="text-lg font-semibold">
-                  Current Bidders
-                </h3>
+                <h3 className="text-lg font-semibold">Current Bidders</h3>
               </div>
               <span className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                {productBids.length} {productBids.length === 1 ? "bid" : "bids"}
+                {bids.length} {bids.length === 1 ? "bid" : "bids"}
               </span>
             </div>
 
-            {productBids.length > 0 ? (
+            {bids.length > 0 ? (
               <div className="space-y-3">
-                {productBids
-                  .sort((a, b) => b.bidAmount - a.bidAmount)
+                {[...bids]
+                  .sort((a, b) => b.amount - a.amount)
                   .map((bid, index) => (
                     <div
                       key={bid.id}
@@ -162,7 +206,6 @@ export function ProductDetails() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          {/* Position Badge */}
                           <div
                             className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
                               index === 0
@@ -177,7 +220,7 @@ export function ProductDetails() {
                               {bid.bidderName}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {bid.timestamp.toLocaleString([], {
+                              {new Date(bid.createdAt).toLocaleString([], {
                                 month: "short",
                                 day: "numeric",
                                 hour: "2-digit",
@@ -188,7 +231,7 @@ export function ProductDetails() {
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-gray-900">
-                            ${bid.bidAmount}
+                            ${bid.amount}
                           </p>
                           {index === 0 && (
                             <Badge variant="default" className="mt-1 bg-green-600">
@@ -214,11 +257,11 @@ export function ProductDetails() {
           </div>
 
           {/* Place Bid Form */}
-          {product.status === "open" && (
+          {isOpen && (
             <form onSubmit={handlePlaceBid} className="space-y-3 pb-6">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                 <p className="text-sm text-amber-900 font-medium">
-                  💡 Minimum bid: ${highestBid ? highestBid + 1 : product.askPrice + 1}
+                  Minimum bid: ${minBid}
                 </p>
               </div>
               <div className="flex gap-3">
@@ -231,12 +274,17 @@ export function ProductDetails() {
                     onChange={(e) => setBidAmount(e.target.value)}
                     required
                     step="0.01"
-                    min={highestBid ? highestBid + 1 : product.askPrice + 1}
+                    min={minBid}
                     className="h-12 text-base"
                   />
                 </div>
-                <Button type="submit" size="lg" className="rounded-full px-8 h-12">
-                  Place Bid
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="rounded-full px-8 h-12"
+                  disabled={submitting}
+                >
+                  {submitting ? "Placing..." : "Place Bid"}
                 </Button>
               </div>
             </form>

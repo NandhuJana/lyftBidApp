@@ -4,34 +4,68 @@ import { ArrowLeft, Link as LinkIcon, ChevronLeft, ChevronRight } from "lucide-r
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { Toaster } from "./ui/sonner";
+import { uploadAPI, productsAPI } from "@/services/api";
 
 interface PreviewData {
   title: string;
   description: string;
   images: string[];
+  startingPrice: number;
+  category: string;
+  endTime: string;
 }
 
 export function ProductPreview() {
   const navigate = useNavigate();
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const data = sessionStorage.getItem("productPreview");
     if (data) {
       setPreviewData(JSON.parse(data));
     } else {
-      // If no data, redirect back
       navigate("/create");
     }
   }, [navigate]);
 
-  const handleCreateLink = () => {
-    // Simulate creating the link
-    toast.success("Product link created successfully!");
-    setTimeout(() => {
-      navigate("/seller/existing");
-    }, 1500);
+  const handleCreateLink = async () => {
+    if (!previewData) return;
+
+    setCreating(true);
+    try {
+      // Upload images first
+      const pendingFiles: File[] = (window as any).__pendingProductImages || [];
+      let imageUrls: string[] = [];
+
+      if (pendingFiles.length > 0) {
+        imageUrls = await uploadAPI.uploadMultiple(pendingFiles);
+      }
+
+      // Create the product
+      await productsAPI.create({
+        title: previewData.title,
+        description: previewData.description,
+        startingPrice: previewData.startingPrice,
+        category: previewData.category,
+        endTime: previewData.endTime,
+        images: imageUrls,
+      });
+
+      // Cleanup
+      sessionStorage.removeItem("productPreview");
+      delete (window as any).__pendingProductImages;
+
+      toast.success("Product created successfully!");
+      setTimeout(() => {
+        navigate("/seller/existing");
+      }, 1000);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create product");
+    } finally {
+      setCreating(false);
+    }
   };
 
   const goToPrevImage = () => {
@@ -76,7 +110,7 @@ export function ProductPreview() {
           <h1 className="text-2xl">Preview Listing</h1>
         </div>
         <p className="text-sm text-gray-600 ml-12">
-          Review before creating link
+          Review before publishing
         </p>
       </div>
 
@@ -92,7 +126,6 @@ export function ProductPreview() {
             />
           </div>
 
-          {/* Navigation Buttons */}
           {previewData.images.length > 1 && (
             <>
               <Button
@@ -114,7 +147,6 @@ export function ProductPreview() {
             </>
           )}
 
-          {/* Image Counter */}
           {previewData.images.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1 rounded-full text-sm">
               {currentImageIndex + 1} / {previewData.images.length}
@@ -124,12 +156,10 @@ export function ProductPreview() {
 
         {/* Product Details */}
         <div className="px-6 py-6 space-y-6">
-          {/* Title */}
           <div>
             <h2 className="text-2xl mb-3">{previewData.title}</h2>
           </div>
 
-          {/* Description */}
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-2">
               Description
@@ -137,6 +167,26 @@ export function ProductPreview() {
             <p className="text-base text-gray-700 leading-relaxed whitespace-pre-wrap">
               {previewData.description}
             </p>
+          </div>
+
+          {/* Price and Details */}
+          <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Starting Price</span>
+              <span className="font-semibold">${previewData.startingPrice}</span>
+            </div>
+            {previewData.category && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Category</span>
+                <span className="font-medium">{previewData.category}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Bidding Ends</span>
+              <span className="font-medium">
+                {new Date(previewData.endTime).toLocaleString()}
+              </span>
+            </div>
           </div>
 
           {/* Image Gallery Thumbnails */}
@@ -167,24 +217,16 @@ export function ProductPreview() {
             </div>
           )}
 
-          {/* Info Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <p className="text-sm text-blue-900">
-              <span className="font-semibold">Ready to publish?</span>
-              <br />
-              Click "Create Link" to generate a shareable link for your listing
-            </p>
-          </div>
-
-          {/* Create Link Button */}
+          {/* Create Button */}
           <div className="pb-6">
             <Button
               onClick={handleCreateLink}
               className="w-full rounded-full h-14 text-lg"
               size="lg"
+              disabled={creating}
             >
               <LinkIcon className="h-6 w-6 mr-2" />
-              Create Link
+              {creating ? "Creating..." : "Create Listing"}
             </Button>
           </div>
         </div>

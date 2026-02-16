@@ -12,41 +12,35 @@ export function CreateProduct() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
+    startingPrice: "",
+    category: "",
+    endTime: "",
   });
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [cameraPermissionGranted, setCameraPermissionGranted] = useState<boolean | null>(null);
 
-  // Check and request camera permission
   const checkCameraPermission = async () => {
     try {
-      // Check if the Permissions API is available
       if ('permissions' in navigator) {
         const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
         setCameraPermissionGranted(result.state === 'granted');
-
         result.addEventListener('change', () => {
           setCameraPermissionGranted(result.state === 'granted');
         });
-
         return result.state === 'granted';
       }
-      // Fallback for browsers that don't support Permissions API
       return true;
-    } catch (error) {
-      console.log('Camera permission check not supported, will prompt on use');
+    } catch {
       return true;
     }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0) {
-      return;
-    }
+    if (!files || files.length === 0) return;
 
     const fileArray = Array.from(files);
-
-    // Validate file size (10MB max)
     const invalidFiles = fileArray.filter(file => file.size > 10 * 1024 * 1024);
     if (invalidFiles.length > 0) {
       toast.error(`Some files exceed 10MB limit and were skipped`);
@@ -60,6 +54,7 @@ export function CreateProduct() {
       reader.onloadend = () => {
         newPreviews.push(reader.result as string);
         if (newPreviews.length === validFiles.length) {
+          setImageFiles((prev) => [...prev, ...validFiles]);
           setImagePreviews((prev) => [...prev, ...newPreviews]);
           toast.success(`${validFiles.length} image${validFiles.length > 1 ? 's' : ''} added`);
         }
@@ -72,29 +67,22 @@ export function CreateProduct() {
   };
 
   const handleCameraCapture = async () => {
-    // Request permission first
     const hasPermission = await checkCameraPermission();
-
     if (!hasPermission && cameraPermissionGranted === false) {
       toast.error('Camera permission denied. Please enable it in your device settings.');
       return;
     }
-
-    // Trigger the camera input
     const cameraInput = document.getElementById('camera-input') as HTMLInputElement;
-    if (cameraInput) {
-      cameraInput.click();
-    }
+    if (cameraInput) cameraInput.click();
   };
 
   const handleGallerySelect = () => {
     const galleryInput = document.getElementById('gallery-input') as HTMLInputElement;
-    if (galleryInput) {
-      galleryInput.click();
-    }
+    if (galleryInput) galleryInput.click();
   };
 
   const removeImage = (index: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
     toast.success('Image removed');
   };
@@ -107,15 +95,32 @@ export function CreateProduct() {
       return;
     }
 
-    // Store data in sessionStorage to pass to preview page
+    if (!formData.startingPrice || parseFloat(formData.startingPrice) < 0.01) {
+      toast.error('Please enter a valid starting price');
+      return;
+    }
+
+    if (!formData.endTime) {
+      toast.error('Please set a bid end time');
+      return;
+    }
+
+    // Store form data and file references for the preview page
     sessionStorage.setItem(
       "productPreview",
       JSON.stringify({
         title: formData.title,
         description: formData.description,
+        startingPrice: parseFloat(formData.startingPrice),
+        category: formData.category,
+        endTime: new Date(formData.endTime).toISOString(),
         images: imagePreviews,
       })
     );
+
+    // Store files in a global ref since they can't be serialized to sessionStorage
+    (window as any).__pendingProductImages = imageFiles;
+
     navigate("/preview/new");
   };
 
@@ -147,9 +152,7 @@ export function CreateProduct() {
               id="title"
               placeholder="Enter product name"
               value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               required
               className="text-base"
             />
@@ -161,24 +164,59 @@ export function CreateProduct() {
             <Textarea
               id="description"
               placeholder="Describe your product in detail..."
-              rows={6}
+              rows={4}
               value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              required
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="text-base resize-none"
             />
-            <p className="text-xs text-gray-500">
-              Include key details like condition, features, and specifications
-            </p>
+          </div>
+
+          {/* Starting Price */}
+          <div className="space-y-2">
+            <Label htmlFor="startingPrice">Starting Price ($)</Label>
+            <Input
+              id="startingPrice"
+              type="number"
+              inputMode="decimal"
+              placeholder="0.00"
+              step="0.01"
+              min="0.01"
+              value={formData.startingPrice}
+              onChange={(e) => setFormData({ ...formData, startingPrice: e.target.value })}
+              required
+              className="text-base"
+            />
+          </div>
+
+          {/* Category */}
+          <div className="space-y-2">
+            <Label htmlFor="category">Category</Label>
+            <Input
+              id="category"
+              placeholder="e.g. Electronics, Fashion, Sports"
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              className="text-base"
+            />
+          </div>
+
+          {/* End Time */}
+          <div className="space-y-2">
+            <Label htmlFor="endTime">Bid End Time</Label>
+            <Input
+              id="endTime"
+              type="datetime-local"
+              value={formData.endTime}
+              onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+              required
+              className="text-base"
+            />
           </div>
 
           {/* Product Images */}
           <div className="space-y-3">
             <Label>Product Images</Label>
 
-            {/* Image Previews */}
             {imagePreviews.length > 0 && (
               <div className="grid grid-cols-2 gap-3 mb-3">
                 {imagePreviews.map((preview, index) => (
@@ -195,7 +233,7 @@ export function CreateProduct() {
                       className="absolute top-2 right-2 h-7 w-7 p-0 rounded-full opacity-90 group-hover:opacity-100 transition-opacity"
                       onClick={() => removeImage(index)}
                     >
-                      ×
+                      x
                     </Button>
                     <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                       {index + 1} of {imagePreviews.length}
@@ -205,9 +243,7 @@ export function CreateProduct() {
               </div>
             )}
 
-            {/* Camera and Gallery Buttons */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Camera Button */}
               <div className="relative">
                 <input
                   id="camera-input"
@@ -227,17 +263,12 @@ export function CreateProduct() {
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                       <Camera className="h-6 w-6 text-blue-600" />
                     </div>
-                    <div className="text-sm font-medium text-gray-700">
-                      Take Photo
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Use Camera
-                    </div>
+                    <div className="text-sm font-medium text-gray-700">Take Photo</div>
+                    <div className="text-xs text-gray-500">Use Camera</div>
                   </div>
                 </Button>
               </div>
 
-              {/* Gallery Button */}
               <div className="relative">
                 <input
                   id="gallery-input"
@@ -257,25 +288,11 @@ export function CreateProduct() {
                     <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                       <ImageIcon className="h-6 w-6 text-green-600" />
                     </div>
-                    <div className="text-sm font-medium text-gray-700">
-                      From Gallery
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Select Photos
-                    </div>
+                    <div className="text-sm font-medium text-gray-700">From Gallery</div>
+                    <div className="text-xs text-gray-500">Select Photos</div>
                   </div>
                 </Button>
               </div>
-            </div>
-
-            {/* Info Text */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-xs text-blue-800">
-                📸 <strong>Camera Permission:</strong> Your browser will ask for camera access when you tap "Take Photo"
-              </p>
-              <p className="text-xs text-blue-700 mt-1">
-                Works on both iOS and Android devices
-              </p>
             </div>
 
             {imagePreviews.length === 0 && (

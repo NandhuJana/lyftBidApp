@@ -1,35 +1,38 @@
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { ArrowLeft, Package, FileText, Box, Shirt } from "lucide-react";
 import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { mockProducts, mockBids } from "../data/mockData";
+import { productsAPI, type ProductResponse } from "@/services/api";
+import { FALLBACK_PRODUCTS } from "../data/fallbackData"; // TODO: Remove once API is live
 
-const productImages: Record<string, string> = {
-  "1": "https://images.unsplash.com/photo-1588420635201-3a9e2a2a0a07?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwY2FtZXJhJTIwcGhvdG9ncmFwaHl8ZW58MXx8fHwxNzcwNzk1MTY3fDA&ixlib=rb-4.1.0&q=80&w=1080",
-  "2": "https://images.unsplash.com/photo-1639564879163-a2a85682410e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjB3YXRjaCUyMHRpbWVwaWVjZXxlbnwxfHx8fDE3NzA3ODM3Nzd8MA&ixlib=rb-4.1.0&q=80&w=1080",
-  "3": "https://images.unsplash.com/photo-1656480930913-dc35796ff5cc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGJpa2UlMjBvdXRkb29yfGVufDF8fHx8MTc3MDg1OTE5Mnww&ixlib=rb-4.1.0&q=80&w=1080",
-};
-
-// Icon mapping for different categories
-const categoryIcons = {
+const categoryIcons: Record<string, typeof Package> = {
   electronics: Package,
   fashion: Shirt,
   sports: Box,
-  default: FileText,
 };
 
 export function ExistingListings() {
   const navigate = useNavigate();
-  
-  // Filter products for current seller (assuming seller1 is current user)
-  const myListings = mockProducts.filter((p) => p.sellerId === "seller1");
+  const [listings, setListings] = useState<ProductResponse[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const getBidsCount = (productId: string) => {
-    return mockBids.filter((b) => b.productId === productId).length;
-  };
+  useEffect(() => {
+    productsAPI
+      .getAll({ size: 50 })
+      .then((data) => {
+        // TODO: Remove fallback once API is live
+        setListings(data.products.length > 0 ? data.products : FALLBACK_PRODUCTS);
+      })
+      .catch(() => {
+        // TODO: Remove fallback once API is live
+        setListings(FALLBACK_PRODUCTS);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const getStatusVariant = (status: string) => {
     switch (status.toLowerCase()) {
+      case "active":
       case "open":
         return "bg-green-100 text-green-700 border-green-200";
       case "closed":
@@ -42,12 +45,11 @@ export function ExistingListings() {
   };
 
   const getStatusDisplay = (status: string) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   };
 
   const getCategoryIcon = (category: string) => {
-    const Icon = categoryIcons[category as keyof typeof categoryIcons] || categoryIcons.default;
-    return Icon;
+    return categoryIcons[category?.toLowerCase()] || FileText;
   };
 
   return (
@@ -66,16 +68,19 @@ export function ExistingListings() {
           <h1 className="text-2xl">My Listings</h1>
         </div>
         <p className="text-sm text-gray-600 ml-12">
-          {myListings.length} {myListings.length === 1 ? "listing" : "listings"}
+          {listings.length} {listings.length === 1 ? "listing" : "listings"}
         </p>
       </div>
 
-      {/* Listings - List View */}
+      {/* Listings */}
       <div className="flex-1 overflow-y-auto">
-        {myListings.length > 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-gray-500">Loading listings...</p>
+          </div>
+        ) : listings.length > 0 ? (
           <div className="divide-y divide-gray-200">
-            {myListings.map((product) => {
-              const bidsCount = getBidsCount(product.id);
+            {listings.map((product) => {
               const Icon = getCategoryIcon(product.category);
 
               return (
@@ -86,14 +91,12 @@ export function ExistingListings() {
                 >
                   <div className="px-6 py-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center gap-4">
-                      {/* Icon on Left */}
                       <div className="flex-shrink-0">
                         <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
                           <Icon className="h-6 w-6 text-blue-600" />
                         </div>
                       </div>
 
-                      {/* Product Details in Middle */}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-base mb-1 truncate">
                           {product.title}
@@ -103,16 +106,15 @@ export function ExistingListings() {
                         </p>
                         <div className="flex items-center gap-3 text-sm">
                           <span className="text-gray-500">
-                            {bidsCount} {bidsCount === 1 ? "bid" : "bids"}
+                            {product.bidCount} {product.bidCount === 1 ? "bid" : "bids"}
                           </span>
-                          <span className="text-gray-300">•</span>
+                          <span className="text-gray-300">&bull;</span>
                           <span className="text-gray-900 font-medium">
-                            ${product.askPrice}
+                            ${product.startingPrice}
                           </span>
                         </div>
                       </div>
 
-                      {/* Status on Right */}
                       <div className="flex-shrink-0">
                         <div
                           className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusVariant(
