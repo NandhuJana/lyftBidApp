@@ -14,7 +14,7 @@ export function NotFound() {
           The page you're looking for doesn't exist.
         </p>
         <Button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/home")}
           className="rounded-full mt-6"
           size="lg"
         >

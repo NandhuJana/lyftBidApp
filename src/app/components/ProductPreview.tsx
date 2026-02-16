@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { Toaster } from "./ui/sonner";
 import { uploadAPI, productsAPI } from "@/services/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface PreviewData {
   title: string;
@@ -17,18 +18,24 @@ interface PreviewData {
 
 export function ProductPreview() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    const data = sessionStorage.getItem("productPreview");
+    if (!isAuthenticated) {
+      toast.error("Please log in to create a listing");
+      navigate("/");
+      return;
+    }
+    const data = (window as any).__pendingProductPreview;
     if (data) {
-      setPreviewData(JSON.parse(data));
+      setPreviewData(data);
     } else {
       navigate("/create");
     }
-  }, [navigate]);
+  }, [navigate, isAuthenticated]);
 
   const handleCreateLink = async () => {
     if (!previewData) return;
@@ -51,10 +58,11 @@ export function ProductPreview() {
         category: previewData.category,
         endTime: previewData.endTime,
         images: imageUrls,
+        joyOfGiving: false,
       });
 
       // Cleanup
-      sessionStorage.removeItem("productPreview");
+      delete (window as any).__pendingProductPreview;
       delete (window as any).__pendingProductImages;
 
       toast.success("Product created successfully!");

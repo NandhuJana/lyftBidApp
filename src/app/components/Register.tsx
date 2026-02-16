@@ -22,7 +22,7 @@ export function Register() {
     try {
       await register(email, password, fullName, phone || undefined);
       toast.success("Account created successfully!");
-      navigate("/");
+      navigate("/home");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Registration failed");
     } finally {
@@ -111,7 +111,7 @@ export function Register() {
 
         <p className="text-center text-sm text-gray-600 mt-6">
           Already have an account?{" "}
-          <Link to="/login" className="text-blue-600 font-medium">
+          <Link to="/" className="text-blue-600 font-medium">
             Login
           </Link>
         </p>

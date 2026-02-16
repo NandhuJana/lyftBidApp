@@ -49,7 +49,7 @@ export function Home() {
           <div className="flex items-center gap-2">
             {!isAuthenticated && (
               <Button asChild size="icon" variant="outline" className="rounded-full">
-                <Link to="/login">
+                <Link to="/">
                   <LogIn className="h-5 w-5" />
                 </Link>
               </Button>

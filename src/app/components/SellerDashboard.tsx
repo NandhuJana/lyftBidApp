@@ -13,7 +13,7 @@ export function SellerDashboard() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/home")}
             className="rounded-full"
           >
             <ArrowLeft className="h-5 w-5" />

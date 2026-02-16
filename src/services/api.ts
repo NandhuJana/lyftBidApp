@@ -1,4 +1,28 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+// Android emulator uses 10.0.2.2 to reach host machine's localhost
+import { Capacitor } from '@capacitor/core';
+
+function getApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) return envUrl;
+
+  // Use Capacitor's native platform detection (more reliable than userAgent)
+  if (Capacitor.getPlatform() === 'android') {
+    return 'http://10.0.2.2:8080/api';
+  }
+  return 'http://localhost:8080/api';
+}
+
+const API_BASE_URL = getApiBaseUrl();
+
+// DEBUG: expose logs for Login debug panel
+(window as any).__apiDebugLogs = [] as string[];
+function apiDebugLog(msg: string) {
+  console.log('[API DEBUG]', msg);
+  (window as any).__apiDebugLogs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+}
+apiDebugLog(`API_BASE_URL = ${API_BASE_URL}`);
+apiDebugLog(`Platform = ${Capacitor.getPlatform()}`);
+apiDebugLog(`isNative = ${Capacitor.isNativePlatform()}`);
 
 // --- Token management ---
 
@@ -43,6 +67,7 @@ export interface ProductResponse {
   endTime: string;
   sellerId: string;
   sellerName: string;
+  joyOfGiving: boolean;
   bidCount: number;
   createdAt: string;
   updatedAt: string;
@@ -62,6 +87,7 @@ export interface CreateProductRequest {
   images?: string[];
   startingPrice: number;
   category?: string;
+  joyOfGiving?: boolean;
   endTime: string;
 }
 
@@ -160,10 +186,20 @@ async function apiRequest<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const fullUrl = `${API_BASE_URL}${endpoint}`;
+  apiDebugLog(`FETCH ${options.method || 'GET'} ${fullUrl}`);
+
+  let response: Response;
+  try {
+    response = await fetch(fullUrl, {
+      ...options,
+      headers,
+    });
+    apiDebugLog(`Response: ${response.status} ${response.statusText}`);
+  } catch (fetchError: any) {
+    apiDebugLog(`FETCH ERROR: ${fetchError.message || fetchError}`);
+    throw fetchError;
+  }
 
   // Handle 401 - try token refresh
   if (response.status === 401 && getRefreshToken()) {

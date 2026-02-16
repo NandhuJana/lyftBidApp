@@ -18,6 +18,10 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
+        Component: Login,
+      },
+      {
+        path: "home",
         Component: Home,
       },
       {

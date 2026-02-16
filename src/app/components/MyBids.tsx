@@ -44,7 +44,7 @@ export function MyBids() {
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center gap-3 mb-4">
           <Button asChild variant="ghost" size="icon">
-            <Link to="/">
+            <Link to="/home">
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
@@ -70,7 +70,7 @@ export function MyBids() {
               Start bidding on items you're interested in
             </p>
             <Button asChild>
-              <Link to="/">Browse Marketplace</Link>
+              <Link to="/home">Browse Marketplace</Link>
             </Button>
           </div>
         ) : (

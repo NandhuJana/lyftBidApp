@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Eye, Camera, Image as ImageIcon } from "lucide-react";
 import { Button } from "./ui/button";
@@ -6,9 +6,18 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { toast } from "sonner";
+import { useAuth } from "@/app/context/AuthContext";
 
 export function CreateProduct() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error("Please log in to create a listing");
+      navigate("/");
+    }
+  }, [isAuthenticated, navigate]);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -105,20 +114,15 @@ export function CreateProduct() {
       return;
     }
 
-    // Store form data and file references for the preview page
-    sessionStorage.setItem(
-      "productPreview",
-      JSON.stringify({
-        title: formData.title,
-        description: formData.description,
-        startingPrice: parseFloat(formData.startingPrice),
-        category: formData.category,
-        endTime: new Date(formData.endTime).toISOString(),
-        images: imagePreviews,
-      })
-    );
-
-    // Store files in a global ref since they can't be serialized to sessionStorage
+    // Store form data and files in memory (sessionStorage can exceed iOS quota with base64 images)
+    (window as any).__pendingProductPreview = {
+      title: formData.title,
+      description: formData.description,
+      startingPrice: parseFloat(formData.startingPrice),
+      category: formData.category,
+      endTime: new Date(formData.endTime).toISOString(),
+      images: imagePreviews,
+    };
     (window as any).__pendingProductImages = imageFiles;
 
     navigate("/preview/new");
